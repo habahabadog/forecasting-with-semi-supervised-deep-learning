@@ -1,7 +1,19 @@
 # Checkpoint Layout
 
-Training writes checkpoints to this directory by default. The files are not
-committed because trained weights are usually too large for normal Git history.
+Training writes checkpoints to this directory by default. Large checkpoint sets
+should normally be uploaded through GitHub Releases or Git LFS instead of normal
+Git history.
+
+The repository includes two small legacy 15-minute split checkpoints:
+
+```text
+pretrained/fusioncast_15min_temporal_legacy.pth
+pretrained/fusioncast_15min_spatial_legacy.pth
+```
+
+They correspond to the original files `base_model_500.pth` and
+`base_model2_500.pth` from the pre-publication experiment code. Load them with
+`python legacy_15min.py`.
 
 Suggested names for manuscript artifacts:
 

@@ -1,0 +1,19 @@
+{
+  "fusioncast_15min_temporal_legacy.pth": {
+    "source_name": "base_model_500.pth",
+    "source_experiment": "original 10/ 15-minute split checkpoint",
+    "module": "temporal RCANtime",
+    "state_dict": true,
+    "input_channels": 24,
+    "output_channels": 36
+  },
+  "fusioncast_15min_spatial_legacy.pth": {
+    "source_name": "base_model2_500.pth",
+    "source_experiment": "original 10/ 15-minute split checkpoint",
+    "module": "spatial RCAN",
+    "state_dict": true,
+    "input_channels": 12,
+    "output_channels": 3,
+    "spatial_scale": 2
+  }
+}

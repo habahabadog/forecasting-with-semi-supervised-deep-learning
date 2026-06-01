@@ -82,7 +82,7 @@ class RCAB(nn.Module):
                 modules.append(nn.BatchNorm2d(n_feat))
             if idx == 0:
                 modules.append(act)
-        modules.append(CALayer(n_feat, reduction))
+        modules.append(CALayer(n_feat))
 
         for idx in range(2):
             modules.append(conv(n_feat, n_feat, kernel_size, bias=bias))
@@ -156,7 +156,9 @@ class RCAN(nn.Module):
         ]
         body.append(conv(n_feats, n_feats, kernel_size))
         self.body = nn.Sequential(*body)
-        self.tail = common.Upsampler(conv, scale, n_feats, out_channels=out_chan)
+        self.tail = nn.Sequential(
+            common.Upsampler(conv, scale, n_feats, out_channels=out_chan)
+        )
 
     def forward(self, x):
         x = self.head(x)

@@ -33,6 +33,8 @@ The default variable order follows the manuscript experiments:
   high-resolution spatial loss used by the manuscript.
 - `quick_test.py` runs no-data forward checks for 30-, 15-, and 10-minute
   settings.
+- `legacy_15min.py` loads the original split 15-minute checkpoint files from
+  the pre-publication experiment code.
 - `run.sh` is a Linux/macOS convenience launcher for training.
 - `configs/` contains example JSON configurations for the three cadences.
 - `checkpoints/README.md` documents the expected pretrained-weight layout.
@@ -135,11 +137,29 @@ without loading data.
 
 ## Pretrained Weights
 
-Pretrained weights are not currently included in this repository. To reproduce
-the exact manuscript figures without retraining, the following artifacts should
-be provided as GitHub Releases, Git LFS files, or another archived asset:
+This repository includes the original split 15-minute checkpoint files from the
+pre-publication experiment code:
 
-- 15-minute FusionCast weights used for the typhoon/cold-wave case studies
+```text
+checkpoints/pretrained/fusioncast_15min_temporal_legacy.pth
+checkpoints/pretrained/fusioncast_15min_spatial_legacy.pth
+```
+
+They can be loaded with:
+
+```bash
+python legacy_15min.py
+```
+
+These legacy files correspond to the original `base_model_500.pth` and
+`base_model2_500.pth` temporal/spatial modules. They are kept for provenance;
+new checkpoints produced by `train.py` use the cleaned public API and are saved
+under `checkpoints/fusioncast_epoch_XXX.pth`.
+
+To reproduce every manuscript figure without retraining, the following
+additional artifacts should still be provided as GitHub Releases, Git LFS files,
+or another archived asset:
+
 - 10-minute and 30-minute weights used for the multi-cadence comparison
 - the normalization statistics used at training time
 - metadata describing the train/validation/test file split
