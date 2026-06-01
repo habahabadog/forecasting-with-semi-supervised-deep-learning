@@ -1,139 +1,252 @@
-import os
-from model import CascadeSRModel
-from utils import *
+"""Train FusionCast on preprocessed hourly weather-field arrays."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
 import torch
 from torch import nn
-from torch.utils.tensorboard import SummaryWriter
-import time
 
-torch.cuda.empty_cache()
+from model import FusionCast
+from utils import build_dataloaders, setup_seed
 
-# 显式指定设备
-device = torch.device("cuda:0")
 
-# 模型与损失函数
-model = CascadeSRModel().to(device)
-criterion = nn.L1Loss().to(device)
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--data-dir", default="../art/artnpy")
+    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--device", default="auto")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--variables", type=int, default=4)
+    parser.add_argument("--steps-per-hour", type=int, default=3)
+    parser.add_argument("--spatial-scale", type=int, default=5)
+    parser.add_argument("--n-resgroups", type=int, default=2)
+    parser.add_argument("--n-resblocks", type=int, default=2)
+    parser.add_argument("--n-feats", type=int, default=96)
+    parser.add_argument("--reduction", type=int, default=16)
+    parser.add_argument("--checkpoint-dir", default="checkpoints")
+    parser.add_argument("--log-dir", default="logs_train")
+    parser.add_argument("--split-timestamp", default="20221000")
+    parser.add_argument("--dry-run", action="store_true")
+    return parser.parse_args()
 
-# 优化器与学习率
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, mode='min', factor=0.1, patience=10, verbose=True,
-    threshold=0.0001, threshold_mode='rel', cooldown=10, min_lr=1e-8, eps=1e-8)
 
-os.makedirs('model', exist_ok=True)
-writer = SummaryWriter("logs_train")
+def resolve_device(requested_device):
+    if requested_device == "auto":
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(requested_device)
+    if device.type == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA was requested but is not available")
+    return device
 
-epoch = 100
-start_time = time.time()
 
-for i in range(epoch):
-    model.train()
-    total_train_loss = 0
-    print(f"------第 {i+1} 轮训练开始------ ")
+def split_subhour_frames(tensor, variables):
+    if tensor.shape[1] % variables != 0:
+        raise ValueError("temporal output channels must be divisible by variables")
+    return list(torch.split(tensor, variables, dim=1))
 
-    # 训练
-    for low_da, low2, high_da, _ in train_load:
-        low_da, low2, high_da = low_da.to(device), low2.to(device), high_da.to(device)
 
-        optimizer.zero_grad()
+def temporal_consistency_loss(interval, left_anchor, right_anchor, criterion, variables):
+    frames = split_subhour_frames(interval, variables)
+    steps = len(frames)
+    loss = interval.new_tensor(0.0)
+    for idx, frame in enumerate(frames, start=1):
+        left_weight = (steps + 1 - idx) / steps
+        right_weight = idx / steps
+        loss = loss + left_weight * criterion(frame, left_anchor)
+        loss = loss + right_weight * criterion(frame, right_anchor)
+    return loss
 
-        x1, x2, o1, o2, o3, outputs = model(low_da)
-        
-        loss1 = criterion(outputs, high_da)
-        loss2 = criterion(o1, low2)
-        loss3 = criterion(o2, low2)
-        loss4 = criterion(o3, low2)
-#         loss = loss1 + loss2 + loss3 + loss4
-        # 新增 loss
-        loss5 = criterion(x1[:, :4], low_da[:, :4])*3/3
-        loss6 = criterion(x1[:, 4:8], low_da[:, :4])*2/3
-        loss7 = criterion(x1[:, 8:12], low_da[:, :4])*1/3
 
-        loss8  = criterion(x1[:, :4], low_da[:, 4:8])*1/3
-        loss9  = criterion(x1[:, 4:8], low_da[:, 4:8])*2/3
-        loss10 = criterion(x1[:, 8:12], low_da[:, 4:8])*3/3
+def fusioncast_loss(outputs, low_sequence, low_anchor, high_anchor, criterion, variables):
+    first_interval, second_interval = outputs[0], outputs[1]
+    anchor_candidates = outputs[2:-1]
+    high_res_anchor = outputs[-1]
 
-        loss11 = criterion(x2[:, :4], low_da[:, 4:8])*3/3
-        loss12 = criterion(x2[:, 4:8], low_da[:, 4:8])*2/3
-        loss13 = criterion(x2[:, 8:12], low_da[:, 4:8])*1/3
+    left_hour = low_sequence[:, :variables]
+    middle_hour = low_sequence[:, variables : 2 * variables]
+    right_hour = low_sequence[:, 2 * variables : 3 * variables]
 
-        loss14 = criterion(x2[:, :4], low_da[:, 8:])*1/3
-        loss15 = criterion(x2[:, 4:8], low_da[:, 8:])*2/3
-        loss16 = criterion(x2[:, 8:12], low_da[:, 8:])*3/3
-        
-        extra_loss = (loss5 + loss6 + loss7 + loss8 + loss9 + loss10 + loss11 + loss12 + loss13 + loss14 + loss15 + loss16)
-        loss = loss1 + loss2 + loss3 + loss4 + extra_loss
+    high_res_loss = criterion(high_res_anchor, high_anchor)
+    anchor_loss = sum(criterion(candidate, low_anchor) for candidate in anchor_candidates)
+    consistency_loss = temporal_consistency_loss(
+        first_interval, left_hour, middle_hour, criterion, variables
+    )
+    consistency_loss = consistency_loss + temporal_consistency_loss(
+        second_interval, middle_hour, right_hour, criterion, variables
+    )
+    total_loss = high_res_loss + anchor_loss + consistency_loss
+    metrics = {
+        "high_res": float(high_res_loss.detach().cpu()),
+        "anchor": float(anchor_loss.detach().cpu()),
+        "consistency": float(consistency_loss.detach().cpu()),
+    }
+    return total_loss, metrics
 
-        loss.backward()
-        optimizer.step()
 
-        total_train_loss += loss.item()
-        del low_da, low2, high_da, o1, o2, o3, outputs, loss
-        torch.cuda.empty_cache()
+def run_epoch(model, loader, criterion, device, variables, optimizer=None):
+    is_train = optimizer is not None
+    model.train(is_train)
+    total_loss = 0.0
 
-    avg_train_loss = total_train_loss / (len(train_dataset) / batch_size)
-    print(f"整体训练集上的loss: {avg_train_loss:.6f}")
-    writer.add_scalar("train_loss", avg_train_loss, i + 1)
+    for low_sequence, low_anchor, high_anchor, _ in loader:
+        low_sequence = low_sequence.to(device)
+        low_anchor = low_anchor.to(device)
+        high_anchor = high_anchor.to(device)
 
-    # 验证
+        with torch.set_grad_enabled(is_train):
+            outputs = model(low_sequence)
+            loss, _ = fusioncast_loss(
+                outputs, low_sequence, low_anchor, high_anchor, criterion, variables
+            )
+            if is_train:
+                optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                optimizer.step()
+
+        total_loss += loss.item()
+
+    return total_loss / max(1, len(loader))
+
+
+def evaluate_high_res_mae(model, loader, criterion, device):
     model.eval()
-    total_test_loss = 0
+    total_loss = 0.0
     with torch.no_grad():
-        for low_da, low2, high_da, _ in test_load:
-            low_da, low2, high_da = low_da.to(device), low2.to(device), high_da.to(device)
+        for low_sequence, _, high_anchor, _ in loader:
+            low_sequence = low_sequence.to(device)
+            high_anchor = high_anchor.to(device)
+            high_res_anchor = model(low_sequence)[-1]
+            total_loss += criterion(high_res_anchor, high_anchor).item()
+    return total_loss / max(1, len(loader))
 
-            x1, x2, o1, o2, o3, outputs = model(low_da)
 
-            loss1 = criterion(outputs, high_da)
-            loss2 = criterion(o1, low2)
-            loss3 = criterion(o2, low2)
-            loss4 = criterion(o3, low2)
-    #         loss = loss1 + loss2 + loss3 + loss4
-            # 新增 loss
-            loss5 = criterion(x1[:, :4], low_da[:, :4])*3/3
-            loss6 = criterion(x1[:, 4:8], low_da[:, :4])*2/3
-            loss7 = criterion(x1[:, 8:12], low_da[:, :4])*1/3
+def save_checkpoint(model, checkpoint_dir, epoch, args, val_loss):
+    checkpoint_dir = Path(checkpoint_dir)
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "epoch": epoch,
+        "model_state_dict": model.state_dict(),
+        "config": vars(args),
+        "val_loss": val_loss,
+    }
+    torch.save(payload, checkpoint_dir / f"fusioncast_epoch_{epoch:03d}.pth")
+    torch.save(
+        model.temporal_model.state_dict(),
+        checkpoint_dir / f"fusioncast_temporal_epoch_{epoch:03d}.pth",
+    )
+    torch.save(
+        model.spatial_model.state_dict(),
+        checkpoint_dir / f"fusioncast_spatial_epoch_{epoch:03d}.pth",
+    )
 
-            loss8  = criterion(x1[:, :4], low_da[:, 4:8])*1/3
-            loss9  = criterion(x1[:, 4:8], low_da[:, 4:8])*2/3
-            loss10 = criterion(x1[:, 8:12], low_da[:, 4:8])*3/3
 
-            loss11 = criterion(x2[:, :4], low_da[:, 4:8])*3/3
-            loss12 = criterion(x2[:, 4:8], low_da[:, 4:8])*2/3
-            loss13 = criterion(x2[:, 8:12], low_da[:, 4:8])*1/3
+class NullSummaryWriter:
+    """Drop-in writer used when TensorBoard is not installed."""
 
-            loss14 = criterion(x2[:, :4], low_da[:, 8:])*1/3
-            loss15 = criterion(x2[:, 4:8], low_da[:, 8:])*2/3
-            loss16 = criterion(x2[:, 8:12], low_da[:, 8:])*3/3
+    def add_scalar(self, *args, **kwargs):
+        del args, kwargs
 
-            extra_loss = (loss5 + loss6 + loss7 + loss8 + loss9 + loss10 + loss11 + loss12 + loss13 + loss14 + loss15 + loss16)
-            loss = loss1 + loss2 + loss3 + loss4 + extra_loss
+    def close(self):
+        pass
 
-            total_test_loss += loss.item()
 
-    avg_test_loss = total_test_loss / (len(test_dataset) / batch_size)
-    print(f"整体验证集上的loss: {avg_test_loss:.6f}")
-    scheduler.step(avg_test_loss)
-    writer.add_scalar("test_loss", avg_test_loss, i + 1)
+def build_summary_writer(log_dir):
+    try:
+        from torch.utils.tensorboard import SummaryWriter
+    except ImportError:
+        print("TensorBoard is not installed; scalar logging is disabled.")
+        return NullSummaryWriter()
+    return SummaryWriter(log_dir)
 
-    # 保存模型权重
-    torch.save(model.base_model.state_dict(), f'./model/base_model_{i+1}.pth')
-    torch.save(model.base_model2.state_dict(), f'./model/base_model2_{i+1}.pth')
-    print("模型已保存")
 
-    # 测试集额外评估
-    total_t_loss = 0
-    with torch.no_grad():
-        for low_da, low2, high_da, _ in new_load:
-            low_da, high_da = low_da.to(device), high_da.to(device)
+def build_model(args):
+    return FusionCast(
+        variables=args.variables,
+        steps_per_hour=args.steps_per_hour,
+        spatial_scale=args.spatial_scale,
+        n_resgroups=args.n_resgroups,
+        n_resblocks=args.n_resblocks,
+        n_feats=args.n_feats,
+        reduction=args.reduction,
+    )
 
-            _, _, _, _, _, outputs = model(low_da)
-            loss1 = criterion(outputs, high_da)
-            total_t_loss += loss1.item()
 
-    avg_t_loss = total_t_loss / (len(new_dataset) / batch_size)
-    print(f"整体测试集上的loss: {avg_t_loss:.6f}")
-    writer.add_scalar("t_loss", avg_t_loss, i + 1)
+def dry_run(args, device):
+    model = build_model(args).to(device)
+    criterion = nn.L1Loss().to(device)
+    low_size = 8
+    high_size = low_size * args.spatial_scale
+    low_sequence = torch.randn(2, 3 * args.variables, low_size, low_size, device=device)
+    low_anchor = torch.randn(2, args.variables, low_size, low_size, device=device)
+    high_anchor = torch.randn(2, args.variables, high_size, high_size, device=device)
+    outputs = model(low_sequence)
+    loss, metrics = fusioncast_loss(
+        outputs, low_sequence, low_anchor, high_anchor, criterion, args.variables
+    )
+    loss.backward()
+    print(f"dry-run loss: {loss.item():.6f}")
+    print(f"loss components: {metrics}")
+    print(f"output shapes: {[tuple(output.shape) for output in outputs]}")
 
-writer.close()
+
+def main():
+    args = parse_args()
+    setup_seed(args.seed)
+    device = resolve_device(args.device)
+    print(f"Using device: {device}")
+
+    if args.dry_run:
+        dry_run(args, device)
+        return
+
+    data = build_dataloaders(
+        args.data_dir,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        spatial_stride=args.spatial_scale,
+        split_timestamp=args.split_timestamp,
+    )
+    model = build_model(args).to(device)
+    criterion = nn.L1Loss().to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=0.1,
+        patience=10,
+        threshold=0.0001,
+        threshold_mode="rel",
+        cooldown=10,
+        min_lr=1e-8,
+        eps=1e-8,
+    )
+    writer = build_summary_writer(args.log_dir)
+
+    for epoch in range(1, args.epochs + 1):
+        train_loss = run_epoch(
+            model, data.train_loader, criterion, device, args.variables, optimizer
+        )
+        val_loss = run_epoch(model, data.val_loader, criterion, device, args.variables)
+        test_mae = evaluate_high_res_mae(model, data.test_loader, criterion, device)
+        scheduler.step(val_loss)
+
+        writer.add_scalar("loss/train", train_loss, epoch)
+        writer.add_scalar("loss/val", val_loss, epoch)
+        writer.add_scalar("mae/test_high_res", test_mae, epoch)
+        save_checkpoint(model, args.checkpoint_dir, epoch, args, val_loss)
+
+        print(
+            f"epoch {epoch:03d}: train={train_loss:.6f}, "
+            f"val={val_loss:.6f}, test_mae={test_mae:.6f}"
+        )
+
+    writer.close()
+
+
+if __name__ == "__main__":
+    main()

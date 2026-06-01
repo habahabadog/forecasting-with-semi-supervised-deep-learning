@@ -1,90 +1,166 @@
-## Project Overview
+# FusionCast
 
-This repository contains a PyTorch implementation of a cascade super-resolution model for spatiotemporal data.  
-The core idea is to reconstruct high-resolution fields from low-resolution inputs using a Residual Channel Attention Network (RCAN) backbone and a cascade architecture.
+PyTorch reference implementation for **FusionCast**, a semi-supervised
+spatiotemporal downscaling method for regional NWP-like weather guidance.
 
-## Main Files
+FusionCast ingests three consecutive hourly coarse-resolution fields
+`[T0, T60, T120]`, estimates sub-hourly low-resolution states between the
+hourly anchors, and applies spatial super-resolution to produce kilometre-scale
+weather fields. The public implementation supports the cadences used in the
+manuscript:
 
-- **`common.py`**  
-  Low-level building blocks for convolutional neural networks, including:
-  - `default_conv` factory for 2D convolutions
-  - `MeanShift` for simple normalization / denormalization
-  - `BasicBlock`, `ResBlock`, and `Upsampler` modules used by the main models
+| Cadence | `--steps-per-hour` | Intermediate states per hour |
+| --- | ---: | ---: |
+| 30 minutes | 1 | 1 |
+| 15 minutes | 3 | 3 |
+| 10 minutes | 5 | 5 |
 
-- **`model.py`**  
-  Defines the main neural network architectures:
-  - Channel attention modules (`CALayer`, `AverageChannelAttention`)
-  - Residual Channel Attention Block (`RCAB`) and `ResidualGroup`
-  - `RCAN` and `RCANtime` super-resolution networks
-  - `CascadeSRModel`, which applies `RCANtime` and `RCAN` in a cascade to produce multi-step super-resolved outputs
+The default variable order follows the manuscript experiments:
 
-- **`utils.py`**  
-  Data utilities and configuration:
-  - Global seeding via `setup_seed`
-  - Dataset definition `MyDataset` that loads `.npy` files from `../art/artnpy`, normalizes them, and builds stacked sequences
-  - Construction of `train_dataset`, `test_dataset`, `new_dataset` and their corresponding `DataLoader`s (`train_load`, `test_load`, `new_load`)
+1. 2 m temperature
+2. 10 m U wind
+3. 10 m V wind
+4. precipitation
 
-- **`train.py`**  
-  Training script for `CascadeSRModel`:
-  - Builds model and L1 loss on GPU
-  - Uses Adam optimizer with `ReduceLROnPlateau` scheduler
-  - Runs training / validation loops and logs to TensorBoard (`logs_train`)
-  - Saves model weights for the two base models into the `model/` directory each epoch
+## Repository Contents
 
-- **`run.sh`**  
-  Convenience shell script (Linux/macOS) that:
-  - Sets `CUDA_VISIBLE_DEVICES`
-  - Sets `PYTORCH_CUDA_ALLOC_CONF` for CUDA memory behavior
-  - Launches `python train.py`
+- `model.py` defines `FusionCast`, the temporal RCAN operator, the spatial RCAN
+  operator, deployment inference through `predict_subhourly()`, and the
+  backward-compatible `CascadeSRModel` alias.
+- `utils.py` contains deterministic setup, hourly sequence construction, and
+  PyTorch dataloaders for preprocessed `.npy` fields.
+- `train.py` trains FusionCast with the anchor-supervised temporal loss and the
+  high-resolution spatial loss used by the manuscript.
+- `quick_test.py` runs no-data forward checks for 30-, 15-, and 10-minute
+  settings.
+- `run.sh` is a Linux/macOS convenience launcher for training.
+- `configs/` contains example JSON configurations for the three cadences.
+- `checkpoints/README.md` documents the expected pretrained-weight layout.
 
-## Requirements
-
-- Python 3.8+ (recommended)
-- PyTorch (GPU build recommended)
-- NumPy
-- TensorBoard (for log visualization)
-
-Install typical dependencies with:
+## Installation
 
 ```bash
-pip install torch torchvision tensorboard numpy
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-You also need preprocessed `.npy` files placed in `../art/artnpy` as expected by `utils.py`.
+Install the PyTorch build appropriate for your CUDA version if GPU training is
+needed. CPU is sufficient for `quick_test.py`.
 
-## How to Train
+## Quick Test
 
-### Option 1: Direct Python (need data)
-
-```bash
-python train.py
-```
-
-### Option 2: Shell Script (need data)
-
-```bash
-bash run.sh
-```
-
-You can edit `run.sh` to change the GPU index or other environment variables.
-
-## Quick Test (Sanity Check)
-
-To quickly check that the model code and environment are set up correctly, you can run a forward pass with random data:
-
-1. Make sure you have installed the required Python packages.
-2. Run the following command in this folder:
+Run a shape-only smoke test without data:
 
 ```bash
 python quick_test.py
 ```
 
-This script will:
+Expected behavior: the script instantiates small FusionCast models for
+`steps_per_hour` values 1, 3, and 5, performs forward passes on random tensors,
+and prints output shapes.
 
-- Instantiate `CascadeSRModel`
-- Move it to CUDA if available (otherwise CPU)
-- Create a random input tensor with the expected shape
-- Run a forward pass and print the output tensor shapes
+To test the manuscript-scale hidden width:
 
-If the script finishes without errors and prints shapes, the basic model wiring and environment are working.
+```bash
+python quick_test.py --paper-config
+```
 
+On some Windows scientific Python stacks, PyTorch may fail before execution
+with a duplicate OpenMP runtime error. Fix the Python environment if possible;
+for a local smoke test only, this workaround can be used:
+
+```powershell
+$env:KMP_DUPLICATE_LIB_OK="TRUE"; python quick_test.py
+```
+
+## Data Format
+
+Training expects hourly `.npy` files named with UTC+8 local timestamps, for
+example:
+
+```text
+2022100209.npy
+2022100210.npy
+2022100211.npy
+```
+
+Each file should store a `float32` array with shape:
+
+```text
+[variables, height, width]
+```
+
+The loader builds consecutive three-hour windows and downsamples the native
+high-resolution grid by `--spatial-scale` to create coarse inputs. The default
+normalization statistics in `utils.py` match the manuscript experiments.
+
+The full meteorological archive used in the paper is not redistributed in this
+repository because the authors do not control its public release rights.
+
+## Training
+
+For the default 15-minute setting:
+
+```bash
+python train.py --data-dir /path/to/artnpy --steps-per-hour 3
+```
+
+For the 10- and 30-minute settings:
+
+```bash
+python train.py --data-dir /path/to/artnpy --steps-per-hour 5
+python train.py --data-dir /path/to/artnpy --steps-per-hour 1
+```
+
+Useful options:
+
+```bash
+python train.py \
+  --data-dir /path/to/artnpy \
+  --epochs 100 \
+  --batch-size 16 \
+  --device auto \
+  --checkpoint-dir checkpoints
+```
+
+Training saves:
+
+- combined model checkpoints: `checkpoints/fusioncast_epoch_XXX.pth`
+- temporal operator weights: `checkpoints/fusioncast_temporal_epoch_XXX.pth`
+- spatial operator weights: `checkpoints/fusioncast_spatial_epoch_XXX.pth`
+
+Use `python train.py --dry-run` to verify the training loss and backward pass
+without loading data.
+
+## Pretrained Weights
+
+Pretrained weights are not currently included in this repository. To reproduce
+the exact manuscript figures without retraining, the following artifacts should
+be provided as GitHub Releases, Git LFS files, or another archived asset:
+
+- 15-minute FusionCast weights used for the typhoon/cold-wave case studies
+- 10-minute and 30-minute weights used for the multi-cadence comparison
+- the normalization statistics used at training time
+- metadata describing the train/validation/test file split
+
+See `checkpoints/README.md` for a suggested file naming convention.
+
+## Manuscript Alignment
+
+This repository implements the software components described in the manuscript:
+
+- temporal interpolation from hourly coarse fields
+- anchor-based partial supervision at the central hourly frame
+- spatial super-resolution from 5 km to 1 km grids
+- cadence-flexible generation for 10-, 15-, and 30-minute products
+- deployment-style high-resolution sub-hourly sequence generation through
+  `FusionCast.predict_subhourly()`
+
+The repository does not contain the full restricted meteorological dataset or
+the trained weights unless they are added separately.
+
+## Citation
+
+If you use this software, please cite the associated manuscript listed in
+`CITATION.cff`.

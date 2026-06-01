@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the associated manuscript."
+title: "FusionCast: a semi-supervised spatiotemporal downscaling method for regional NWP-like guidance"
+authors:
+  - family-names: Meng
+    given-names: Xiangrui
+  - family-names: Zhao
+    given-names: Huan
+  - family-names: Shu
+    given-names: Ting
+  - family-names: Zhao
+    given-names: Junhua
+  - family-names: Wan
+    given-names: Qilin
+repository-code: "https://github.com/habahabadog/forecasting-with-semi-supervised-deep-learning"
+date-released: "2026-06-01"
+preferred-citation:
+  type: article
+  title: "FusionCast: a semi-supervised spatiotemporal downscaling method for regional NWP-like guidance"
+  authors:
+    - family-names: Meng
+      given-names: Xiangrui
+    - family-names: Zhao
+      given-names: Huan
+    - family-names: Shu
+      given-names: Ting
+    - family-names: Zhao
+      given-names: Junhua
+    - family-names: Wan
+      given-names: Qilin
