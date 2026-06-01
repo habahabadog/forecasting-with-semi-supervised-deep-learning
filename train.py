@@ -55,8 +55,8 @@ def temporal_consistency_loss(interval, left_anchor, right_anchor, criterion, va
     steps = len(frames)
     loss = interval.new_tensor(0.0)
     for idx, frame in enumerate(frames, start=1):
-        left_weight = (steps + 1 - idx) / steps
-        right_weight = idx / steps
+        left_weight = 1.0 - idx / (steps + 1)
+        right_weight = idx / (steps + 1)
         loss = loss + left_weight * criterion(frame, left_anchor)
         loss = loss + right_weight * criterion(frame, right_anchor)
     return loss
