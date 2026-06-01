@@ -38,6 +38,8 @@ The default variable order follows the manuscript experiments:
 - `run.sh` is a Linux/macOS convenience launcher for training.
 - `configs/` contains example JSON configurations for the three cadences.
 - `checkpoints/README.md` documents the expected pretrained-weight layout.
+- `data/demo/` contains two small pre-stacked `.npy` tensors for inference
+  smoke tests.
 
 ## Installation
 
@@ -66,6 +68,12 @@ To test the manuscript-scale hidden width:
 
 ```bash
 python quick_test.py --paper-config
+```
+
+To verify loading of the included demonstration `.npy` tensors:
+
+```bash
+python quick_test.py --demo-data-dir data/demo
 ```
 
 On some Windows scientific Python stacks, PyTorch may fail before execution
@@ -99,6 +107,11 @@ normalization statistics in `utils.py` match the manuscript experiments.
 
 The full meteorological archive used in the paper is not redistributed in this
 repository because the authors do not control its public release rights.
+
+The included `data/demo/` files are small pre-stacked inference tensors with
+shape `[3 * variables, height, width] = [12, 61, 121]`. They are provided only
+for smoke testing `FusionCast.predict_subhourly()` and are not a substitute for
+the hourly training archive expected by `train.py`.
 
 ## Training
 
