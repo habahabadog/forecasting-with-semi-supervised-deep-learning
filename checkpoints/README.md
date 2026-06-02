@@ -1,35 +1,13 @@
-# Checkpoint Layout
+# Checkpoints
 
-Training writes checkpoints to this directory by default. Large checkpoint sets
-should normally be uploaded through GitHub Releases or Git LFS instead of normal
-Git history.
+Final manuscript checkpoints are not included in this local clean package yet.
 
-The repository includes two small legacy 15-minute split checkpoints:
+Before submission, add checkpoint metadata here:
 
-```text
-pretrained/fusioncast_15min_temporal_legacy.pth
-pretrained/fusioncast_15min_spatial_legacy.pth
-```
+| Cadence | Temporal checkpoint | Spatial checkpoint | Source run | Notes |
+| --- | --- | --- | --- | --- |
+| 15 min | TBD | TBD | 2022 four-variable run | Required for reviewer inference. |
+| 10 min | TBD | TBD | 2022 four-variable run | Optional if included in manuscript. |
+| 30 min | TBD | TBD | 2022 four-variable run | Optional if included in manuscript. |
 
-They correspond to the original files `base_model_500.pth` and
-`base_model2_500.pth` from the pre-publication experiment code. Load them with
-`python legacy_15min.py`.
-
-Suggested names for manuscript artifacts:
-
-```text
-fusioncast_15min.pth
-fusioncast_15min_temporal.pth
-fusioncast_15min_spatial.pth
-fusioncast_10min.pth
-fusioncast_10min_temporal.pth
-fusioncast_10min_spatial.pth
-fusioncast_30min.pth
-fusioncast_30min_temporal.pth
-fusioncast_30min_spatial.pth
-normalization_stats.json
-split_metadata.json
-```
-
-For public reproducibility, upload these through GitHub Releases or Git LFS and
-link them from the repository README.
+Do not add 2019 three-variable or legacy 15-minute checkpoints to this package.
