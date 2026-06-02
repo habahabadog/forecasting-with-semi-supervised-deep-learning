@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument("--reduction", type=int, default=16)
     parser.add_argument("--checkpoint-dir", default="checkpoints")
     parser.add_argument("--log-dir", default="logs_train")
-    parser.add_argument("--split-timestamp", default="20221000")
+    parser.add_argument("--split-timestamp", default="2022100100")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 

@@ -108,10 +108,10 @@ normalization statistics in `utils.py` match the manuscript experiments.
 ## Split Protocol
 
 By default, `train.py` follows the manuscript split implemented in
-`utils.split_files`: files before `--split-timestamp 20221000` are sorted
+`utils.split_files`: files before `--split-timestamp 2022100100` are sorted
 chronologically and split 8:2 into training and validation subsets. The first
 80% of those pre-cutoff files are used for training, and the remaining 20% are
-used for validation. Files after the split timestamp are used for testing. For
+used for validation. Files at or after the split timestamp are used for testing. For
 the 2022 hourly archive used in the manuscript, this corresponds to January
 through September split 8:2 for training/validation, with October through
 December held out as the independent test period.
@@ -123,6 +123,47 @@ The included `data/demo/` files are small pre-stacked inference tensors with
 shape `[3 * variables, height, width] = [12, 61, 121]`. They are provided only
 for smoke testing `FusionCast.predict_subhourly()` and are not a substitute for
 the hourly training archive expected by `train.py`.
+
+## Baseline and Case Metrics
+
+`scripts/evaluate_baselines.py` computes simple interpolation baselines on the
+same three-hour windows used for model training. It reports overall MAE/RMSE,
+per-variable MAE/RMSE, and wind-vector RMSE when U/V wind channels are present.
+
+For the public four-variable hourly archive:
+
+```bash
+python scripts/evaluate_baselines.py \
+  --data /path/to/artnpy \
+  --format public \
+  --split-timestamp 2022100100 \
+  --train-fraction 0.8 \
+  --output baseline_metrics.csv
+```
+
+For event tables, pass one or more target-time ranges:
+
+```bash
+python scripts/evaluate_baselines.py \
+  --data /path/to/artnpy \
+  --format public \
+  --case maon,2022082513,2022082513 \
+  --case cold_wave,2022112913,2022112913 \
+  --output case_metrics.csv
+```
+
+The same script can also read the archived 2019 legacy zip layout and compare
+against the included legacy 15-minute checkpoint:
+
+```bash
+python scripts/evaluate_baselines.py \
+  --data "/path/to/data (1).zip" \
+  --format legacy \
+  --legacy-checkpoint \
+  --device cpu \
+  --case smoke,2019120100,2019120100 \
+  --output legacy_case_metrics.csv
+```
 
 ## Training
 
@@ -147,7 +188,7 @@ python train.py \
   --epochs 100 \
   --batch-size 16 \
   --device auto \
-  --split-timestamp 20221000 \
+  --split-timestamp 2022100100 \
   --checkpoint-dir checkpoints
 ```
 
