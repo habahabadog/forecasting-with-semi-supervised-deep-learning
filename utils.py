@@ -141,13 +141,12 @@ class DataBundle:
     test_dataset: WeatherSequenceDataset
 
 
-def split_files(file_list, split_timestamp="2022100100", train_fraction=0.8):
-    split_time = parse_hourly_timestamp(f"{split_timestamp}.npy")
+def split_files(file_list, split_timestamp="20221000", train_fraction=0.8):
     train_candidates = sorted(
-        file_name for file_name in file_list if parse_hourly_timestamp(file_name) < split_time
+        file_name for file_name in file_list if file_name < f"{split_timestamp}.npy"
     )
     test_files = sorted(
-        file_name for file_name in file_list if parse_hourly_timestamp(file_name) >= split_time
+        file_name for file_name in file_list if file_name > f"{split_timestamp}.npy"
     )
 
     train_size = max(3, int(len(train_candidates) * train_fraction))
@@ -165,7 +164,7 @@ def build_dataloaders(
     batch_size=16,
     num_workers=0,
     spatial_stride=5,
-    split_timestamp="2022100100",
+    split_timestamp="20221000",
 ):
     files = list_npy_files(data_dir)
     train_files, val_files, test_files = split_files(files, split_timestamp)
