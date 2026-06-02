@@ -1,0 +1,5 @@
+setting,split,cadence_min,t2m_mae,u10_mae,v10_mae,precip_mae,mean_mae,changed_component,source_file,notes
+FusionCast full,TBD,TBD,TBD,TBD,TBD,TBD,TBD,none,TBD,TBD
+without temporal module / one-step variant,TBD,TBD,TBD,TBD,TBD,TBD,TBD,temporal_module,TBD,TBD
+altered CA/AC order,TBD,TBD,TBD,TBD,TBD,TBD,TBD,attention_order,TBD,TBD
+simpler CNN/RCAN/SAN baseline,TBD,TBD,TBD,TBD,TBD,TBD,TBD,model_capacity,TBD,TBD

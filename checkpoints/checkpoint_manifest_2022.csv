@@ -1,0 +1,4 @@
+cadence_min,temporal_checkpoint,spatial_checkpoint,source_run,sha256,size_bytes,notes
+15,TBD,TBD,2022_four_variable_run,TBD,TBD,Required for reviewer inference if checkpoint release is allowed.
+10,TBD,TBD,2022_four_variable_run,TBD,TBD,Optional if 10-min results remain in manuscript.
+30,TBD,TBD,2022_four_variable_run,TBD,TBD,Optional if 30-min results remain in manuscript.
