@@ -1,2 +1,0 @@
-dataset_root,file_count,first_timestamp,last_timestamp,channel_count,raw_shape,cropped_shape,missing_hours,corrupt_files,notes
-TBD,TBD,TBD,TBD,4,TBD,TBD,TBD,TBD,Fill after 2022 artnpy data is available.

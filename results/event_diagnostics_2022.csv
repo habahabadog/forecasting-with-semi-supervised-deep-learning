@@ -1,5 +1,0 @@
-event,event_date,split_role,variable_group,metric,value,unit,roi,time_window,sample_count,source_prediction,source_truth,notes
-Typhoon Ma-on,2022-08-25,event-oriented validation diagnostic,wind,wind_speed_mae,TBD,m/s,TBD,TBD,TBD,TBD,TBD,Do not describe as held-out test-period case under current split.
-Typhoon Ma-on,2022-08-25,event-oriented validation diagnostic,wind,wind_vector_rmse,TBD,m/s,TBD,TBD,TBD,TBD,TBD,Alternative or additional metric.
-Cold wave,2022-11-29,held-out test-period case,temperature,temperature_mae,TBD,K,TBD,TBD,TBD,TBD,TBD,TBD
-Cold wave,2022-11-29,held-out test-period case,temperature,gradient_mae,TBD,K/km,TBD,TBD,TBD,TBD,TBD,Alternative or additional metric.

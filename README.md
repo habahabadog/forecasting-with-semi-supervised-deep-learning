@@ -55,12 +55,10 @@ The complete art1km archive is restricted by the original data provider and is n
 Before using this as a public or reviewer-accessible GitHub repository, add:
 
 - final 2022 four-variable checkpoint metadata or checkpoint files where allowed;
-- completed `results/data_audit_2022.csv`;
-- completed `results/classical_baselines_2022.csv`;
-- completed `results/main_table_mae_2022.csv`;
-- completed `results/ablation_2022.csv`;
-- completed `results/event_diagnostics_2022.csv`;
-- completed `results/result_manifest_2022.csv`;
+- `classical_baselines_2022.csv`;
+- `ablation_2022.csv`;
+- `event_diagnostics_2022.csv`;
+- `result_manifest_2022.csv`;
 - a confirmed license.
 
 Do not add 2019 three-variable demo tensors, legacy checkpoints, or the archived December 2019 baseline results.
