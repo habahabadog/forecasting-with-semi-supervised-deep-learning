@@ -105,6 +105,17 @@ The loader builds consecutive three-hour windows and downsamples the native
 high-resolution grid by `--spatial-scale` to create coarse inputs. The default
 normalization statistics in `utils.py` match the manuscript experiments.
 
+## Split Protocol
+
+By default, `train.py` follows the manuscript split implemented in
+`utils.split_files`: files before `--split-timestamp 20221000` are sorted
+chronologically and split 8:2 into training and validation subsets. The first
+80% of those pre-cutoff files are used for training, and the remaining 20% are
+used for validation. Files after the split timestamp are used for testing. For
+the 2022 hourly archive used in the manuscript, this corresponds to January
+through September split 8:2 for training/validation, with October through
+December held out as the independent test period.
+
 The full meteorological archive used in the paper is not redistributed in this
 repository because the authors do not control its public release rights.
 
@@ -136,6 +147,7 @@ python train.py \
   --epochs 100 \
   --batch-size 16 \
   --device auto \
+  --split-timestamp 20221000 \
   --checkpoint-dir checkpoints
 ```
 
