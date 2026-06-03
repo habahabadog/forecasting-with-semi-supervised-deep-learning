@@ -17,7 +17,7 @@ DEFAULT_STD = np.array([4.25024591, 2.50847865, 2.44562078, 67.33232656], dtype=
 @dataclass(frozen=True)
 class SplitConfig:
     train_validation_cutoff: str = "20221000"
-    train_fraction: float = 0.9
+    train_fraction: float = 0.8
 
 
 def list_hourly_files(data_dir: str | Path) -> list[str]:
@@ -63,7 +63,7 @@ class Art1kmTripletDataset(Dataset):
     def __len__(self) -> int:
         return len(self.stacked_list)
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         low_frames = []
         high_frames = []
         for file_name in self.stacked_list[index]:

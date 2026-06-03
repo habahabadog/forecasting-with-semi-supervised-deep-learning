@@ -10,4 +10,4 @@ Expected full-data convention for the 2022 experiments:
 - Hourly target tensors are cropped to `(4, 1030, 1320)`.
 - Coarse inputs are generated from target tensors using stride-5 sampling.
 
-A small derived or synthetic demonstration subset should be added here before submission if data-permission constraints allow.
+The public repository uses random tensors for smoke testing. Those tensors are only for interface checks and are not a substitute for the restricted 2022 evaluation archive.

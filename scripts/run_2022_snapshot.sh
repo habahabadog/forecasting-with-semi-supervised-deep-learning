@@ -1,10 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# 设置GPU编号
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-3}"
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 
-# 设置PyTorch显存碎片优化参数
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-
-# 执行训练脚本
-python train.py
+python scripts/train_2022_snapshot.py

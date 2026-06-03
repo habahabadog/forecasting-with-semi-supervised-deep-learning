@@ -16,7 +16,7 @@ data:
   tensor_shape_daily_npz: [4, 24, 1031, 1321]
   target_grid_after_crop: [4, 1030, 1320]
   train_validation_cutoff: "20221000"
-  train_fraction_before_cutoff: 0.9
+  train_fraction_before_cutoff: 0.8
   test_period: "2022-10 through 2022-12"
   full_archive_access: restricted_by_data_provider
 

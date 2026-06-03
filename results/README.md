@@ -1,8 +1,8 @@
 # Results
 
-This directory is reserved for result manifests that bind manuscript tables to source files.
+This directory is reserved for non-sensitive aggregate result manifests that bind manuscript tables to source files.
 
-Recommended files before submission:
+Optional aggregate files:
 
 - `main_table_mae_2022.csv`
 - `classical_baselines_2022.csv`
